@@ -1,0 +1,7 @@
+{
+  "name": "AetherGeometry",
+  "description": "An interactive, audio-reactive sacred geometry visualizer using WebGL and Web Audio API. Visualize music with fractal mandalas and cymatic patterns.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
