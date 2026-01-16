@@ -34,6 +34,12 @@ const App: React.FC = () => {
   const [resonanceTexture, setResonanceTexture] = useState<THREE.Texture | null>(null);
   const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
   const [visionStatus, setVisionStatus] = useState<string>('');
+  
+  // Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Services Refs
   const audioEngine = useRef<AudioEngine | null>(null);
@@ -129,6 +135,71 @@ const App: React.FC = () => {
     };
   };
 
+  // --- RECORDING HANDLERS ---
+  const handleCanvasCreated = (canvas: HTMLCanvasElement) => {
+    canvasRef.current = canvas;
+  }
+
+  const handleStartRecording = () => {
+    if (!canvasRef.current) {
+        console.error("Canvas not found for recording.");
+        return;
+    }
+    
+    // Capture Canvas Stream (30 FPS)
+    const canvasStream = canvasRef.current.captureStream(30);
+    
+    // Get Audio Stream if available
+    const audioStream = audioEngine.current?.getStream();
+    
+    // Combine tracks
+    const combinedTracks = [
+        ...canvasStream.getVideoTracks(),
+        ...(audioStream ? audioStream.getAudioTracks() : [])
+    ];
+    const combinedStream = new MediaStream(combinedTracks);
+
+    try {
+        const recorder = new MediaRecorder(combinedStream, { 
+            mimeType: 'video/webm; codecs=vp9' 
+        });
+        
+        recordedChunksRef.current = [];
+        
+        recorder.ondataavailable = (e) => { 
+            if (e.data.size > 0) {
+                recordedChunksRef.current.push(e.data); 
+            }
+        };
+        
+        recorder.onstop = () => {
+            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cymatics-export-${Date.now()}.webm`;
+            a.click();
+            URL.revokeObjectURL(url);
+            recordedChunksRef.current = [];
+        };
+        
+        recorder.start();
+        mediaRecorderRef.current = recorder;
+        setIsRecording(true);
+        
+    } catch (e) {
+        console.error("Failed to start MediaRecorder:", e);
+        alert("Video recording failed. Your browser may not support the required format.");
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+    }
+  };
+
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden">
       
@@ -139,6 +210,7 @@ const App: React.FC = () => {
           audioData={audioDataRef} 
           userTexture={userTexture}
           resonanceTexture={resonanceTexture} 
+          onCanvasCreated={handleCanvasCreated}
         />
       </div>
 
@@ -151,6 +223,9 @@ const App: React.FC = () => {
         onFileChange={handleFileChange}
         onImageChange={handleImageChange}
         onStopAudio={handleStopAudio}
+        isRecording={isRecording}
+        onStartRecording={handleStartRecording}
+        onStopRecording={handleStopRecording}
       />
       
       {/* Footer / Status */}

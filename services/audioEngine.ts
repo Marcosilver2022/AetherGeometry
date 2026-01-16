@@ -4,6 +4,7 @@ export class AudioEngine {
   private source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null;
   private dataArray: Uint8Array | null = null;
   private audioElement: HTMLAudioElement | null = null;
+  private streamDest: MediaStreamAudioDestinationNode | null = null;
 
   // Beat Detection State
   private beatCutoff: number = 0;
@@ -18,12 +19,19 @@ export class AudioEngine {
     
     this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     this.analyser = this.audioCtx.createAnalyser();
-    this.analyser.fftSize = 4096; // Increased for better frequency resolution
-    this.analyser.smoothingTimeConstant = 0.85; // Slightly smoother for modal stability
+    this.analyser.fftSize = 4096; 
+    this.analyser.smoothingTimeConstant = 0.85; 
+    
+    // Destination for recording
+    this.streamDest = this.audioCtx.createMediaStreamDestination();
     
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     this.source = this.audioCtx.createMediaStreamSource(stream);
     this.source.connect(this.analyser);
+    
+    // Connect analyser to stream destination (for recording)
+    // Note: We don't connect mic to audioCtx.destination to avoid feedback
+    this.analyser.connect(this.streamDest);
     
     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
   }
@@ -35,6 +43,9 @@ export class AudioEngine {
     this.analyser = this.audioCtx.createAnalyser();
     this.analyser.fftSize = 4096;
     this.analyser.smoothingTimeConstant = 0.85;
+
+    // Destination for recording
+    this.streamDest = this.audioCtx.createMediaStreamDestination();
 
     this.audioElement = new Audio();
     this.audioElement.src = URL.createObjectURL(file);
@@ -49,10 +60,19 @@ export class AudioEngine {
 
     this.source = this.audioCtx.createMediaElementSource(this.audioElement);
     this.source.connect(this.analyser);
+    
+    // Connect to speakers
     this.analyser.connect(this.audioCtx.destination);
+    
+    // Connect to recording stream
+    this.analyser.connect(this.streamDest);
     
     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
     this.audioElement.play();
+  }
+
+  getStream(): MediaStream | null {
+    return this.streamDest ? this.streamDest.stream : null;
   }
 
   getAnalysis() {
@@ -138,6 +158,9 @@ export class AudioEngine {
     if (this.source) {
       this.source.disconnect();
       this.source = null;
+    }
+    if (this.streamDest) {
+        this.streamDest = null;
     }
     if (this.audioCtx) {
       if (this.audioCtx.state !== 'closed') {

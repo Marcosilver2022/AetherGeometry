@@ -3,21 +3,6 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { VisualParams, AnalyzedAudio } from '../types';
 
-// Fix for JSX element type errors
-declare module 'react' {
-  namespace JSX {
-    interface IntrinsicElements {
-      mesh: any;
-      planeGeometry: any;
-      torusGeometry: any;
-      shaderMaterial: any;
-      points: any;
-      bufferGeometry: any;
-      bufferAttribute: any;
-    }
-  }
-}
-
 // --- SHARED PHYSICS MATH (GLSL) ---
 const chladniMath = `
 #define PI 3.14159265359
@@ -47,34 +32,58 @@ float chladniPolygon(vec2 uv, float n, float m) {
     return a;
 }
 
+// --- Bessel Function Approximation for Circular Modes ---
+// J_n(x) ~ sqrt(2/(pi*x)) * cos(x - n*pi/2 - pi/4)
+float bessel(float x, float n) {
+    if (x <= 0.1) return (n < 1.0) ? 1.0 : 0.0; // Limit at 0
+    float phase = x - n * 1.570796 - 0.785398;
+    return inversesqrt(x) * 0.79788 * cos(phase);
+}
+
+// Improved Water Physics
+float chladniWater(vec2 uv, float m, float n, float t, float speed, float damping) {
+    vec2 centered = uv - 0.5;
+    float r = length(centered) * 2.2; 
+    float theta = atan(centered.y, centered.x);
+    
+    float k = 3.0 + n * 4.0;
+    float x = k * r;
+    
+    float radial = bessel(x, m);
+    float angular = cos(m * theta);
+    float temporal = cos(t * speed);
+    
+    float viscous = exp(-damping * r * r);
+    
+    return radial * angular * temporal * viscous;
+}
+
+// Toroidal Coordinates
+// Returns vec2(theta, phi) where theta is major angle, phi is minor angle
 vec2 toroidalCoords(vec3 p, float R) {
     float theta = atan(p.y, p.x);      
-    float r = length(vec2(p.x, p.y)) - R;
-    float phi = atan(p.z, r);          
+    float r_xy = length(vec2(p.x, p.y));
+    float dist_minor = r_xy - R;
+    float phi = atan(p.z, dist_minor);          
     return vec2(theta, phi);
 }
 
+// Chladni on Torus
+// Uses integer modes n, m to ensure continuity across the surface
 float chladniTorus(vec2 tp, float n, float m) {
-    return sin(n * tp.x) * sin(m * tp.y);
+    float theta = tp.x;
+    float phi = tp.y;
+    // Standard Chladni crossing function wrapped on torus topology
+    return cos(n * theta) * cos(m * phi) - cos(m * theta) * cos(n * phi);
 }
 
 // --- NEW: Object Field Binding ---
-// uv: coordinates
-// seed: from texture R channel (normalized freq)
-// group: from texture G channel (harmonic group)
-// energy: audio band energy
 float objectField(vec2 uv, float seed, float group, float energy, float time, float beatPhase) {
     // 3-6-9 Harmonic Logic
     float m = (group * 3.0) + (energy * 6.0);
     float n = (group * 6.0) + (energy * 6.0);
-    
-    // Seed determines the base phase/drift speed
     float drift = time * (seed * 2.0);
-    
-    // Beat Phase injects symmetry jumps
     float phase = drift + beatPhase;
-    
-    // Toroidal-like equation but in 2D space for the mask region
     return sin(m * uv.x + phase) * sin(n * uv.y - phase);
 }
 
@@ -90,6 +99,8 @@ vec2 rotate(vec2 v, float a) {
 const vertexShaderCymatic = `
 varying vec2 vUv;
 varying float vEnergy; 
+varying vec3 vViewPos;
+
 uniform float uTime;
 uniform float uBass;
 uniform float uMid;
@@ -100,9 +111,9 @@ uniform float uModeM;
 uniform float uModeN;
 uniform int uPlateShape;
 uniform float uZoom;
-uniform sampler2D uResonanceMap; // The AI Object Mask
+uniform sampler2D uResonanceMap; 
 uniform bool uUseObjectSeeding;
-uniform float uBeatCumulative; // Accumulates on beat hits
+uniform float uBeatCumulative; 
 
 ${chladniMath}
 
@@ -149,7 +160,6 @@ void main() {
   float baseN = uModeN;
   float baseM = uModeM;
   
-  // Standard Geometry Logic
   if (uPlateShape == 0) { // SQUARE
       pattern += chladniSquare(finalUV, baseN, baseM) * (0.6 + uBass);
       pattern += chladniSquare(finalUV, baseN * 1.5, baseM + 2.0) * uMid;
@@ -160,41 +170,49 @@ void main() {
       pattern += chladniPolygon(finalUV, baseN, baseM) * (0.6 + uBass);
       pattern += chladniPolygon(finalUV, baseN + 1.0, baseM + uTime) * uMid;
   } else if (uPlateShape == 3) { // TORUS
+      // Map 3D pos to Toroidal Angles (R=1.0 matches geometry)
       vec2 tp = toroidalCoords(pos, 1.0);
-      pattern += chladniTorus(tp, baseN * 2.0, baseM * 2.0) * (0.6 + uBass);
-      pattern += chladniTorus(tp, baseN * 3.0, baseM * 3.0 + uTime) * uMid;
+      
+      // Quantize modes to integers to avoid seams on the closed surface
+      float tN = floor(max(2.0, baseN * 2.0));
+      float tM = floor(max(2.0, baseM * 2.0));
+      
+      pattern += chladniTorus(tp, tN, tM) * (0.6 + uBass);
+      
+      // Secondary harmonic
+      pattern += chladniTorus(tp, tN + 1.0, tM + 1.0) * uMid;
+      
+  } else if (uPlateShape == 4) { // WATER
+      float waveSpeed = 2.0 + uReactivity * 4.0;
+      float damping = 0.1 + uMid * 0.5; 
+      pattern += chladniWater(finalUV, baseM, baseN, uTime, waveSpeed, damping) * (0.8 + uBass);
+      pattern += chladniWater(finalUV, baseM + 2.0, baseN + 1.0, uTime, waveSpeed * 1.2, damping) * uMid * 0.3;
   }
 
-  // --- OBJECT SEEDING LOGIC ---
+  // --- OBJECT SEEDING ---
   if (uUseObjectSeeding) {
-      // Sample the resonance map (AI Mask)
-      vec4 resData = texture2D(uResonanceMap, vUv); // Note: using vUv (screen space) for overlay mapping
-      
-      float seedFreq = resData.r * 10.0; // Scaled up
-      float harmonicGroup = resData.g * 10.0; // Scaled (e.g. 0.3 -> 3.0)
+      vec4 resData = texture2D(uResonanceMap, vUv); 
+      float seedFreq = resData.r * 10.0; 
+      float harmonicGroup = resData.g * 10.0; 
       float maskIntensity = resData.b;
       
       if (maskIntensity > 0.1) {
-          // This pixel is inside a detected object
-          // Generate localized object field
           float objPat = objectField(finalUV, seedFreq, harmonicGroup, uBass + uMid, uTime, uBeatCumulative);
-          
-          // Blend: Audio Bass drives how much the object "takes over"
-          // Beat hits make the object pattern dominant
           float blend = maskIntensity * (0.5 + uBass * 0.5);
-          
           pattern = mix(pattern, objPat, blend);
       }
   }
   
   float noiseDetail = snoise(finalUV * 15.0 + uTime) * (uHigh * 0.2);
-  float energy = abs(pattern) + noiseDetail;
+  float energy = pattern + noiseDetail;
   vEnergy = energy;
   
   float zDisp = energy * uDepthDisplacement * uReactivity;
   pos += objectNormal * zDisp;
   
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+  vViewPos = -mvPosition.xyz;
+  gl_Position = projectionMatrix * mvPosition;
 }
 `;
 
@@ -206,9 +224,11 @@ uniform float uBloom;
 uniform float uReactivity;
 uniform bool uHasTexture;
 uniform float uHigh;
+uniform int uPlateShape; 
 
 varying vec2 vUv;
 varying float vEnergy; 
+varying vec3 vViewPos;
 
 vec3 palette( in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d ) {
     return a + b*cos( 6.28318*(c*t+d) );
@@ -217,26 +237,62 @@ vec3 palette( in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d ) {
 void main() {
     float vibration = vEnergy; 
     
-    float nodalLine = 1.0 - smoothstep(0.01, 0.08 + uHigh * 0.1, vibration);
-    float antinode = smoothstep(0.2, 1.0, vibration);
-
-    vec3 col = vec3(0.0);
-    vec3 pCol = palette(vibration * 0.5 + uColorShift + uTime*0.1, 
-                        vec3(0.5), vec3(0.5), vec3(1.0), vec3(0.0, 0.33, 0.67));
-
-    if (uHasTexture) {
-        vec3 texColor = texture2D(uTexture, vUv).rgb;
-        col = texColor;
-        vec3 sandColor = vec3(0.9, 0.9, 0.8);
-        col = mix(col, sandColor, nodalLine * 0.6);
-        col += pCol * antinode * uBloom * uReactivity;
+    // --- WATER RENDERING ---
+    if (uPlateShape == 4) {
+        float bumpScale = 5.0;
+        vec3 dx = vec3(1.0, 0.0, dFdx(vibration) * bumpScale);
+        vec3 dy = vec3(0.0, 1.0, dFdy(vibration) * bumpScale);
+        vec3 normal = normalize(cross(dx, dy));
+        
+        vec3 viewDir = normalize(vViewPos);
+        vec3 lightDir = normalize(vec3(0.5, 0.8, 1.0));
+        vec3 halfVec = normalize(lightDir + viewDir);
+        
+        float NdotH = max(0.0, dot(normal, halfVec));
+        float specular = pow(NdotH, 80.0); 
+        float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 3.0);
+        
+        vec3 deepColor = vec3(0.0, 0.05, 0.2);
+        vec3 shallowColor = vec3(0.0, 0.4, 0.6);
+        vec3 foamColor = vec3(0.9, 0.95, 1.0);
+        
+        float h = vibration * 0.5 + 0.5;
+        vec3 albedo = mix(deepColor, shallowColor, smoothstep(0.3, 0.7, h));
+        albedo = mix(albedo, foamColor, smoothstep(0.85, 1.0, h) * 0.8);
+        
+        vec3 col = albedo;
+        col += vec3(1.0) * specular * 0.8;
+        col += vec3(0.5, 0.7, 1.0) * fresnel * 0.3;
+        
+        vec3 pCol = palette(uColorShift, vec3(0.5), vec3(0.5), vec3(1.0), vec3(0.0, 0.33, 0.67));
+        col = mix(col, col * pCol, 0.3);
+        
+        gl_FragColor = vec4(col, 0.9);
+        
     } else {
-        col = vec3(0.02, 0.02, 0.05); 
-        col += pCol * vibration * uBloom * 1.5;
-        col += vec3(1.0) * nodalLine * 0.6;
-    }
+        // --- STANDARD CHLADNI RENDERING ---
+        float absVib = abs(vibration);
+        float nodalLine = 1.0 - smoothstep(0.01, 0.08 + uHigh * 0.1, absVib);
+        float antinode = smoothstep(0.2, 1.0, absVib);
 
-    gl_FragColor = vec4(col, 1.0);
+        vec3 col = vec3(0.0);
+        vec3 pCol = palette(absVib * 0.5 + uColorShift + uTime*0.1, 
+                            vec3(0.5), vec3(0.5), vec3(1.0), vec3(0.0, 0.33, 0.67));
+
+        if (uHasTexture) {
+            vec3 texColor = texture2D(uTexture, vUv).rgb;
+            col = texColor;
+            vec3 sandColor = vec3(0.9, 0.9, 0.8);
+            col = mix(col, sandColor, nodalLine * 0.6);
+            col += pCol * antinode * uBloom * uReactivity;
+        } else {
+            col = vec3(0.02, 0.02, 0.05); 
+            col += pCol * absVib * uBloom * 1.5;
+            col += vec3(1.0) * nodalLine * 0.6;
+        }
+
+        gl_FragColor = vec4(col, 1.0);
+    }
 }
 `;
 
@@ -245,6 +301,7 @@ interface SceneProps {
   audioData: React.MutableRefObject<AnalyzedAudio>;
   userTexture: THREE.Texture | null;
   resonanceTexture: THREE.Texture | null;
+  onCanvasCreated?: (canvas: HTMLCanvasElement) => void;
 }
 
 const CymaticPlate: React.FC<SceneProps> = ({ params, audioData, userTexture, resonanceTexture }) => {
@@ -344,6 +401,7 @@ const CymaticPlate: React.FC<SceneProps> = ({ params, audioData, userTexture, re
       if (params.plateShape === 'circle') shapeInt = 1;
       if (params.plateShape === 'polygon') shapeInt = 2;
       if (params.plateShape === 'torus') shapeInt = 3;
+      if (params.plateShape === 'water') shapeInt = 4;
       materialRef.current.uniforms.uPlateShape.value = shapeInt;
 
       materialRef.current.uniforms.uBass.value = THREE.MathUtils.lerp(materialRef.current.uniforms.uBass.value, bass * r, 0.2);
@@ -368,17 +426,19 @@ const CymaticPlate: React.FC<SceneProps> = ({ params, audioData, userTexture, re
         transparent={true}
         side={THREE.DoubleSide}
         depthWrite={true}
+        extensions={{ derivatives: true }} 
       />
     </mesh>
   );
 };
 
-export const VisualizerCanvas: React.FC<SceneProps> = (props) => {
+export const VisualizerCanvas: React.FC<SceneProps> = ({ onCanvasCreated, ...props }) => {
   return (
     <Canvas
       camera={{ position: [0, 0, 4], fov: 60 }} 
       dpr={[1, 2]} 
       style={{ width: '100%', height: '100%' }}
+      onCreated={({ gl }) => onCanvasCreated?.(gl.domElement)}
     >
       <CymaticPlate {...props} />
     </Canvas>

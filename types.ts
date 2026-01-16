@@ -6,7 +6,7 @@ export interface VisualParams {
   detail: number; // 1 - 10 (Recursion depth simulation)
   bloom: number; // 0 - 1
   reactivity: number; // 0 - 2 (Multiplier for audio impact)
-  plateShape: 'square' | 'circle' | 'polygon' | 'torus';
+  plateShape: 'square' | 'circle' | 'polygon' | 'torus' | 'water';
   
   // 3D Spatial Controls
   position: { x: number; y: number };

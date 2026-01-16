@@ -10,6 +10,11 @@ interface ControlsProps {
   onImageChange: (file: File) => void;
   onMicEnable: () => void;
   onStopAudio: () => void;
+  
+  // Recording Props
+  isRecording: boolean;
+  onStartRecording: () => void;
+  onStopRecording: () => void;
 }
 
 const Slider: React.FC<{
@@ -44,7 +49,10 @@ export const Controls: React.FC<ControlsProps> = ({
   onFileChange,
   onImageChange,
   onMicEnable,
-  onStopAudio
+  onStopAudio,
+  isRecording,
+  onStartRecording,
+  onStopRecording
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imgInputRef = useRef<HTMLInputElement>(null);
@@ -92,6 +100,22 @@ export const Controls: React.FC<ControlsProps> = ({
              Stop Audio
            </button>
         )}
+      </div>
+
+      {/* Export Controls */}
+      <div className="mb-8">
+        <h3 className="text-xs uppercase font-bold text-gray-500 mb-3 tracking-wider">Export</h3>
+        <button
+            onClick={isRecording ? onStopRecording : onStartRecording}
+            className={`w-full p-2 text-sm rounded border flex items-center justify-center gap-2 ${
+                isRecording 
+                ? 'bg-red-600 border-red-500 text-white animate-pulse' 
+                : 'border-gray-700 text-gray-300 hover:border-indigo-500 hover:text-white'
+            }`}
+        >
+            <div className={`w-2 h-2 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`}></div>
+            {isRecording ? 'Stop Recording' : 'Record Video'}
+        </button>
       </div>
 
       {/* Image Upload */}
@@ -185,30 +209,36 @@ export const Controls: React.FC<ControlsProps> = ({
         
         <div className="mb-4">
             <label className="text-xs text-gray-400 mb-1 block">Plate Shape</label>
-            <div className="flex rounded border border-gray-700 overflow-hidden">
+            <div className="flex rounded border border-gray-700 overflow-hidden flex-wrap">
                 <button 
                     onClick={() => setParams(p => ({...p, plateShape: 'square'}))}
-                    className={`flex-1 p-2 text-[10px] uppercase font-bold ${params.plateShape === 'square' ? 'bg-indigo-600 text-white' : 'bg-transparent text-gray-400'}`}
+                    className={`flex-1 p-2 text-[10px] uppercase font-bold border-r border-gray-800 ${params.plateShape === 'square' ? 'bg-indigo-600 text-white' : 'bg-transparent text-gray-400'}`}
                 >
                     Square
                 </button>
                 <button 
                     onClick={() => setParams(p => ({...p, plateShape: 'circle'}))}
-                    className={`flex-1 p-2 text-[10px] uppercase font-bold ${params.plateShape === 'circle' ? 'bg-indigo-600 text-white' : 'bg-transparent text-gray-400'}`}
+                    className={`flex-1 p-2 text-[10px] uppercase font-bold border-r border-gray-800 ${params.plateShape === 'circle' ? 'bg-indigo-600 text-white' : 'bg-transparent text-gray-400'}`}
                 >
                     Circle
                 </button>
                 <button 
                     onClick={() => setParams(p => ({...p, plateShape: 'polygon'}))}
-                    className={`flex-1 p-2 text-[10px] uppercase font-bold ${params.plateShape === 'polygon' ? 'bg-indigo-600 text-white' : 'bg-transparent text-gray-400'}`}
+                    className={`flex-1 p-2 text-[10px] uppercase font-bold border-r border-gray-800 ${params.plateShape === 'polygon' ? 'bg-indigo-600 text-white' : 'bg-transparent text-gray-400'}`}
                 >
                     Poly
                 </button>
                  <button 
                     onClick={() => setParams(p => ({...p, plateShape: 'torus'}))}
-                    className={`flex-1 p-2 text-[10px] uppercase font-bold ${params.plateShape === 'torus' ? 'bg-indigo-600 text-white' : 'bg-transparent text-gray-400'}`}
+                    className={`flex-1 p-2 text-[10px] uppercase font-bold border-r border-gray-800 ${params.plateShape === 'torus' ? 'bg-indigo-600 text-white' : 'bg-transparent text-gray-400'}`}
                 >
                     Torus
+                </button>
+                <button 
+                    onClick={() => setParams(p => ({...p, plateShape: 'water'}))}
+                    className={`flex-1 p-2 text-[10px] uppercase font-bold ${params.plateShape === 'water' ? 'bg-indigo-600 text-white' : 'bg-transparent text-gray-400'}`}
+                >
+                    Water
                 </button>
             </div>
         </div>
