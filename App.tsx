@@ -21,6 +21,7 @@ const DEFAULT_PARAMS: VisualParams = {
   rotation: { x: 0, y: 0 },
   depthDisplacement: 0.5,
   useObjectSeeding: false,
+  codexGain: 0.65,
 };
 
 const App: React.FC = () => {
@@ -34,6 +35,8 @@ const App: React.FC = () => {
   const [resonanceTexture, setResonanceTexture] = useState<THREE.Texture | null>(null);
   const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
   const [visionStatus, setVisionStatus] = useState<string>('');
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const mediaTextureUrlRef = useRef<string | null>(null);
   
   // Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -72,6 +75,11 @@ const App: React.FC = () => {
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       if (audioEngine.current) audioEngine.current.cleanup();
+      if (videoElementRef.current) {
+        videoElementRef.current.pause();
+        videoElementRef.current.src = '';
+      }
+      if (mediaTextureUrlRef.current) URL.revokeObjectURL(mediaTextureUrlRef.current);
     };
   }, [animate]);
 
@@ -102,9 +110,23 @@ const App: React.FC = () => {
     setAudioState(prev => ({ ...prev, sourceType: 'none', isPlaying: false }));
   };
 
+  const resetMediaTextureUrl = () => {
+    if (mediaTextureUrlRef.current) {
+      URL.revokeObjectURL(mediaTextureUrlRef.current);
+      mediaTextureUrlRef.current = null;
+    }
+  };
+
   const handleImageChange = (file: File) => {
-    setVisionStatus('Analysing...');
+    setVisionStatus('Analysing image...');
+    if (videoElementRef.current) {
+      videoElementRef.current.pause();
+      videoElementRef.current.src = '';
+      videoElementRef.current = null;
+    }
+    resetMediaTextureUrl();
     const url = URL.createObjectURL(file);
+    mediaTextureUrlRef.current = url;
     
     // Load Texture for Visuals
     const loader = new THREE.TextureLoader();
@@ -132,6 +154,52 @@ const App: React.FC = () => {
                 setResonanceTexture(null);
             }
         }
+    };
+  };
+
+  const handleVideoChange = (file: File) => {
+    setVisionStatus('Loading video texture...');
+    if (videoElementRef.current) {
+      videoElementRef.current.pause();
+      videoElementRef.current.src = '';
+    }
+    resetMediaTextureUrl();
+
+    const url = URL.createObjectURL(file);
+    mediaTextureUrlRef.current = url;
+
+    const video = document.createElement('video');
+    video.src = url;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.crossOrigin = 'anonymous';
+    videoElementRef.current = video;
+
+    video.onloadeddata = async () => {
+      const videoTexture = new THREE.VideoTexture(video);
+      videoTexture.colorSpace = THREE.SRGBColorSpace;
+      videoTexture.minFilter = THREE.LinearFilter;
+      videoTexture.magFilter = THREE.LinearFilter;
+      videoTexture.wrapS = THREE.MirroredRepeatWrapping;
+      videoTexture.wrapT = THREE.MirroredRepeatWrapping;
+
+      setUserTexture(videoTexture);
+      setResonanceTexture(null);
+      setDetectedObjects([]);
+      setParams(p => ({ ...p, useObjectSeeding: false }));
+      setVisionStatus(`Video texture active: ${file.name}`);
+
+      try {
+        await video.play();
+      } catch (e) {
+        console.warn('Video autoplay was blocked until user interaction.', e);
+        setVisionStatus(`Video texture loaded: ${file.name}. Click the page if playback pauses.`);
+      }
+    };
+
+    video.onerror = () => {
+      setVisionStatus('Video texture failed to load. Try another format.');
     };
   };
 
@@ -222,6 +290,7 @@ const App: React.FC = () => {
         onMicEnable={handleMicEnable}
         onFileChange={handleFileChange}
         onImageChange={handleImageChange}
+        onVideoChange={handleVideoChange}
         onStopAudio={handleStopAudio}
         isRecording={isRecording}
         onStartRecording={handleStartRecording}
@@ -230,7 +299,7 @@ const App: React.FC = () => {
       
       {/* Footer / Status */}
       <div className="absolute bottom-4 left-4 z-10 text-white/30 text-xs pointer-events-none font-mono flex flex-col gap-1">
-        <span>AetherGeometry v3.2 • 3D Cymatic Engine</span>
+        <span>AetherGeometry v3.3 • Codex-refined 3D Cymatic Engine</span>
         {visionStatus && <span className="text-indigo-400">{visionStatus}</span>}
       </div>
     </div>

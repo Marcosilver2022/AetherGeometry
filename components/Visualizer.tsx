@@ -222,6 +222,7 @@ uniform sampler2D uTexture;
 uniform float uColorShift;
 uniform float uBloom;
 uniform float uReactivity;
+uniform float uCodexGain;
 uniform bool uHasTexture;
 uniform float uHigh;
 uniform int uPlateShape; 
@@ -274,6 +275,8 @@ void main() {
         float absVib = abs(vibration);
         float nodalLine = 1.0 - smoothstep(0.01, 0.08 + uHigh * 0.1, absVib);
         float antinode = smoothstep(0.2, 1.0, absVib);
+        float codexFilament = smoothstep(0.88, 1.0, sin((vUv.x + vUv.y + uTime * 0.08) * 80.0) * 0.5 + 0.5) * uCodexGain;
+        float codexHalo = smoothstep(0.15, 0.95, absVib) * uCodexGain;
 
         vec3 col = vec3(0.0);
         vec3 pCol = palette(absVib * 0.5 + uColorShift + uTime*0.1, 
@@ -285,10 +288,12 @@ void main() {
             vec3 sandColor = vec3(0.9, 0.9, 0.8);
             col = mix(col, sandColor, nodalLine * 0.6);
             col += pCol * antinode * uBloom * uReactivity;
+            col += vec3(0.05, 0.8, 1.0) * codexFilament * 0.18;
         } else {
             col = vec3(0.02, 0.02, 0.05); 
             col += pCol * absVib * uBloom * 1.5;
             col += vec3(1.0) * nodalLine * 0.6;
+            col += vec3(0.0, 0.65, 1.0) * (codexFilament * 0.22 + codexHalo * 0.08);
         }
 
         gl_FragColor = vec4(col, 1.0);
@@ -325,6 +330,7 @@ const CymaticPlate: React.FC<SceneProps> = ({ params, audioData, userTexture, re
     uColorShift: { value: params.colorShift },
     uBloom: { value: params.bloom },
     uReactivity: { value: params.reactivity },
+    uCodexGain: { value: params.codexGain },
     uPlateShape: { value: 0 }, 
     uModeN: { value: 2.0 },
     uModeM: { value: 2.0 },
@@ -392,6 +398,7 @@ const CymaticPlate: React.FC<SceneProps> = ({ params, audioData, userTexture, re
       // Uniforms Updates
       materialRef.current.uniforms.uZoom.value = 1.0 / params.zoom;
       materialRef.current.uniforms.uReactivity.value = params.reactivity;
+      materialRef.current.uniforms.uCodexGain.value = params.codexGain;
       materialRef.current.uniforms.uColorShift.value = params.colorShift;
       materialRef.current.uniforms.uBloom.value = params.bloom;
       materialRef.current.uniforms.uDepthDisplacement.value = params.depthDisplacement;

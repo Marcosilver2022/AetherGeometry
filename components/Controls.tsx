@@ -8,6 +8,7 @@ interface ControlsProps {
   audioState: AudioState;
   onFileChange: (file: File) => void;
   onImageChange: (file: File) => void;
+  onVideoChange: (file: File) => void;
   onMicEnable: () => void;
   onStopAudio: () => void;
   
@@ -48,6 +49,7 @@ export const Controls: React.FC<ControlsProps> = ({
   audioState,
   onFileChange,
   onImageChange,
+  onVideoChange,
   onMicEnable,
   onStopAudio,
   isRecording,
@@ -56,6 +58,7 @@ export const Controls: React.FC<ControlsProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imgInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [loadingAi, setLoadingAi] = React.useState(false);
 
   const handleAiHarmonize = async () => {
@@ -128,12 +131,27 @@ export const Controls: React.FC<ControlsProps> = ({
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
           Upload Image Texture
         </button>
+        <button
+          onClick={() => videoInputRef.current?.click()}
+          className="mt-2 w-full p-2 text-sm rounded border border-cyan-800/70 text-cyan-100 bg-cyan-950/20 hover:border-cyan-500 hover:text-white transition-colors flex items-center justify-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+          Upload Video Texture
+        </button>
+        <p className="mt-2 text-[11px] leading-4 text-gray-500">Videos loop silently as animated texture sources; pair with microphone or audio upload for reactive motion.</p>
         <input
             type="file"
             ref={imgInputRef}
             onChange={(e) => e.target.files?.[0] && onImageChange(e.target.files[0])}
             className="hidden"
             accept="image/*"
+          />
+        <input
+            type="file"
+            ref={videoInputRef}
+            onChange={(e) => e.target.files?.[0] && onVideoChange(e.target.files[0])}
+            className="hidden"
+            accept="video/*"
           />
       </div>
 
@@ -156,6 +174,36 @@ export const Controls: React.FC<ControlsProps> = ({
             </span>
         </button>
        </div>
+
+      {/* Codex Feature Layer */}
+      <div className="mb-8 rounded-xl border border-cyan-500/20 bg-cyan-950/10 p-4 shadow-[0_0_30px_rgba(34,211,238,0.08)]">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xs uppercase font-bold text-cyan-300 mb-1 tracking-wider">Codex Feature Layer</h3>
+            <p className="text-[11px] leading-4 text-gray-500">Agentic refinement adds predictive mesh detail, brighter harmonic edges, and smoother prompt-to-visual presets.</p>
+          </div>
+          <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-200">New</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mb-4 text-[10px] text-gray-400">
+          <div className="rounded border border-white/10 bg-white/5 p-2">Agentic<br /><span className="text-cyan-300">Modes</span></div>
+          <div className="rounded border border-white/10 bg-white/5 p-2">Vision<br /><span className="text-cyan-300">Seeds</span></div>
+          <div className="rounded border border-white/10 bg-white/5 p-2">Audio<br /><span className="text-cyan-300">Sync</span></div>
+        </div>
+        <Slider
+          label="Codex Refinement"
+          value={params.codexGain}
+          min={0}
+          max={1.5}
+          step={0.01}
+          onChange={(v) => setParams(p => ({ ...p, codexGain: v }))}
+        />
+        <button
+          onClick={() => setParams(p => ({ ...p, codexGain: p.codexGain > 0 ? 0 : 0.85, bloom: Math.max(p.bloom, 0.75), detail: Math.max(p.detail, 6) }))}
+          className="w-full rounded border border-cyan-500/40 bg-cyan-500/10 p-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20"
+        >
+          {params.codexGain > 0 ? 'Disable Codex Layer' : 'Enable Codex Layer'}
+        </button>
+      </div>
 
       {/* 3D Spatial Controls */}
       <div className="mb-8">
