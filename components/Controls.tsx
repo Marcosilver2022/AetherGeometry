@@ -8,6 +8,7 @@ interface ControlsProps {
   audioState: AudioState;
   onFileChange: (file: File) => void;
   onImageChange: (file: File) => void;
+  onVideoChange: (file: File) => void;
   onMicEnable: () => void;
   onStopAudio: () => void;
   
@@ -48,6 +49,7 @@ export const Controls: React.FC<ControlsProps> = ({
   audioState,
   onFileChange,
   onImageChange,
+  onVideoChange,
   onMicEnable,
   onStopAudio,
   isRecording,
@@ -56,6 +58,7 @@ export const Controls: React.FC<ControlsProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imgInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [loadingAi, setLoadingAi] = React.useState(false);
 
   const handleAiHarmonize = async () => {
@@ -128,12 +131,27 @@ export const Controls: React.FC<ControlsProps> = ({
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
           Upload Image Texture
         </button>
+        <button
+          onClick={() => videoInputRef.current?.click()}
+          className="mt-2 w-full p-2 text-sm rounded border border-cyan-800/70 text-cyan-100 bg-cyan-950/20 hover:border-cyan-500 hover:text-white transition-colors flex items-center justify-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+          Upload Video Texture
+        </button>
+        <p className="mt-2 text-[11px] leading-4 text-gray-500">Videos loop silently as animated texture sources; pair with microphone or audio upload for reactive motion.</p>
         <input
             type="file"
             ref={imgInputRef}
             onChange={(e) => e.target.files?.[0] && onImageChange(e.target.files[0])}
             className="hidden"
             accept="image/*"
+          />
+        <input
+            type="file"
+            ref={videoInputRef}
+            onChange={(e) => e.target.files?.[0] && onVideoChange(e.target.files[0])}
+            className="hidden"
+            accept="video/*"
           />
       </div>
 

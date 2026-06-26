@@ -7,6 +7,7 @@ AetherGeometry is a browser-based 3D cymatics playground for turning audio, imag
 - **Codex Feature Layer**: a cyan harmonic overlay that adds predictive filament detail to the visualizer.
 - **One-click Codex toggle**: enables the refinement layer while lifting bloom and complexity for a stronger generated look.
 - **Refined status/version copy**: the app now identifies itself as the Codex-refined 3D cymatic engine.
+- **Video texture uploads**: loop local video files as animated visual textures on the cymatic surface.
 - **Cleaner local setup notes**: use Vite with Gemini API credentials for AI resonance presets.
 
 ## Features
@@ -15,6 +16,7 @@ AetherGeometry is a browser-based 3D cymatics playground for turning audio, imag
 - Multiple cymatic plate modes: square, circle, polygon, torus, and water.
 - 3D spatial controls for position, tilt, relief depth, bloom, color, and reactivity.
 - Image texture upload with object-seeded resonance maps.
+- Video texture upload for animated surface sources.
 - AI Resonance preset generation through Gemini.
 - WebM canvas recording for exporting visual sessions.
 
