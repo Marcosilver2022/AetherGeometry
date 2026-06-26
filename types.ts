@@ -15,7 +15,11 @@ export interface VisualParams {
 
   // Object Seeding
   useObjectSeeding: boolean;
+
+  // Codex Feature Layer
+  codexGain: number; // 0 - 1.5, agentic pattern refinement intensity
 }
+
 
 export interface AudioState {
   isPlaying: boolean;

@@ -157,6 +157,36 @@ export const Controls: React.FC<ControlsProps> = ({
         </button>
        </div>
 
+      {/* Codex Feature Layer */}
+      <div className="mb-8 rounded-xl border border-cyan-500/20 bg-cyan-950/10 p-4 shadow-[0_0_30px_rgba(34,211,238,0.08)]">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xs uppercase font-bold text-cyan-300 mb-1 tracking-wider">Codex Feature Layer</h3>
+            <p className="text-[11px] leading-4 text-gray-500">Agentic refinement adds predictive mesh detail, brighter harmonic edges, and smoother prompt-to-visual presets.</p>
+          </div>
+          <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-200">New</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mb-4 text-[10px] text-gray-400">
+          <div className="rounded border border-white/10 bg-white/5 p-2">Agentic<br /><span className="text-cyan-300">Modes</span></div>
+          <div className="rounded border border-white/10 bg-white/5 p-2">Vision<br /><span className="text-cyan-300">Seeds</span></div>
+          <div className="rounded border border-white/10 bg-white/5 p-2">Audio<br /><span className="text-cyan-300">Sync</span></div>
+        </div>
+        <Slider
+          label="Codex Refinement"
+          value={params.codexGain}
+          min={0}
+          max={1.5}
+          step={0.01}
+          onChange={(v) => setParams(p => ({ ...p, codexGain: v }))}
+        />
+        <button
+          onClick={() => setParams(p => ({ ...p, codexGain: p.codexGain > 0 ? 0 : 0.85, bloom: Math.max(p.bloom, 0.75), detail: Math.max(p.detail, 6) }))}
+          className="w-full rounded border border-cyan-500/40 bg-cyan-500/10 p-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20"
+        >
+          {params.codexGain > 0 ? 'Disable Codex Layer' : 'Enable Codex Layer'}
+        </button>
+      </div>
+
       {/* 3D Spatial Controls */}
       <div className="mb-8">
         <h3 className="text-xs uppercase font-bold text-gray-500 mb-3 tracking-wider">Spatial & 3D</h3>

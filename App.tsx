@@ -21,6 +21,7 @@ const DEFAULT_PARAMS: VisualParams = {
   rotation: { x: 0, y: 0 },
   depthDisplacement: 0.5,
   useObjectSeeding: false,
+  codexGain: 0.65,
 };
 
 const App: React.FC = () => {
@@ -230,7 +231,7 @@ const App: React.FC = () => {
       
       {/* Footer / Status */}
       <div className="absolute bottom-4 left-4 z-10 text-white/30 text-xs pointer-events-none font-mono flex flex-col gap-1">
-        <span>AetherGeometry v3.2 • 3D Cymatic Engine</span>
+        <span>AetherGeometry v3.3 • Codex-refined 3D Cymatic Engine</span>
         {visionStatus && <span className="text-indigo-400">{visionStatus}</span>}
       </div>
     </div>
